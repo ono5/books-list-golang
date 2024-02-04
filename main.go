@@ -11,29 +11,15 @@ import (
 
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
+	models "github.com/ono5/books-list-golang/model"
+	"github.com/ono5/books-list-golang/utils"
 	"github.com/subosito/gotenv"
 )
 
-type Book struct {
-	ID     int    `json:"id"`
-	Title  string `json:"title"`
-	Author string `json:"author"`
-	Year   string `json:"year"`
-}
-
 var (
-	books []Book
+	books []models.Book
 	db    *sql.DB
 )
-
-func logFatal(err error, comment string) {
-	if err != nil {
-		fmt.Println("#############################################")
-		log.Fatal(comment)
-		log.Fatal(err)
-		fmt.Println("#############################################")
-	}
-}
 
 func init() {
 	gotenv.Load()
@@ -49,9 +35,9 @@ func main() {
 
 	var err error
 	db, err = sql.Open("postgres", postgresURL)
-	logFatal(err, "SQL Open")
+	utils.LogFatal(err, "SQL Open")
 	err = db.Ping()
-	logFatal(err, "Pint To DB")
+	utils.LogFatal(err, "Pint To DB")
 
 	router := mux.NewRouter()
 
@@ -61,21 +47,22 @@ func main() {
 	router.HandleFunc("/books", updateBook).Methods("PUT")
 	router.HandleFunc("/books/{id}", removeBook).Methods("DELETE")
 
+	fmt.Println("Server is running at port 8000")
 	log.Fatal(http.ListenAndServe(":8000", router))
 }
 
 func getBooks(w http.ResponseWriter, r *http.Request) {
-	var book Book
-	books = []Book{}
+	var book models.Book
+	books = []models.Book{}
 
 	rows, err := db.Query("select * from books")
-	logFatal(err, "getBooks: SELECT")
+	utils.LogFatal(err, "getBooks: SELECT")
 
 	defer rows.Close()
 
 	for rows.Next() {
 		err := rows.Scan(&book.ID, &book.Title, &book.Author, &book.Year)
-		logFatal(err, "getBooks: Scan")
+		utils.LogFatal(err, "getBooks: Scan")
 		books = append(books, book)
 	}
 
@@ -83,18 +70,18 @@ func getBooks(w http.ResponseWriter, r *http.Request) {
 }
 
 func getBook(w http.ResponseWriter, r *http.Request) {
-	var book Book
+	var book models.Book
 
 	params := mux.Vars(r)
 
 	rows := db.QueryRow("select * from books where id=$1", params["id"])
 	err := rows.Scan(&book.ID, &book.Title, &book.Author, &book.Year)
-	logFatal(err, "getBook: Scan")
+	utils.LogFatal(err, "getBook: Scan")
 	json.NewEncoder(w).Encode(book)
 }
 
 func addBook(w http.ResponseWriter, r *http.Request) {
-	var book Book
+	var book models.Book
 	var bookID int
 
 	json.NewDecoder(r.Body).Decode(&book)
@@ -102,13 +89,13 @@ func addBook(w http.ResponseWriter, r *http.Request) {
 		book.Title, book.Author, book.Year,
 	).Scan(&bookID)
 
-	logFatal(err, "addBook: QueryRow")
+	utils.LogFatal(err, "addBook: QueryRow")
 
 	json.NewEncoder(w).Encode(bookID)
 }
 
 func updateBook(w http.ResponseWriter, r *http.Request) {
-	var book Book
+	var book models.Book
 	json.NewDecoder(r.Body).Decode(&book)
 
 	result, err := db.Exec("update books set title=$1, author=$2, year=$3 where id=$4 RETURNING id",
@@ -117,10 +104,10 @@ func updateBook(w http.ResponseWriter, r *http.Request) {
 		&book.Year,
 		&book.ID,
 	)
-	logFatal(err, "updateBook: Exec")
+	utils.LogFatal(err, "updateBook: Exec")
 
 	rowsUpdated, err := result.RowsAffected()
-	logFatal(err, "RowsAffected")
+	utils.LogFatal(err, "RowsAffected")
 
 	json.NewEncoder(w).Encode(rowsUpdated)
 }
@@ -129,10 +116,10 @@ func removeBook(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 
 	result, err := db.Exec("delete from books where id = $1", params["id"])
-	logFatal(err, "removeBook: Exec")
+	utils.LogFatal(err, "removeBook: Exec")
 
 	rowsDeleted, err := result.RowsAffected()
-	logFatal(err, "removeBook: RowsAffected")
+	utils.LogFatal(err, "removeBook: RowsAffected")
 
 	json.NewEncoder(w).Encode(rowsDeleted)
 }
