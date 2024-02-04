@@ -26,7 +26,11 @@ func init() {
 }
 
 func main() {
-	db = driver.ConnectDB()
+	db, err := driver.ConnectDB()
+
+	if err != nil {
+		log.Fatal(err)
+	}
 	controller := controllers.Controller{}
 
 	router := mux.NewRouter()
